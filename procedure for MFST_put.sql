@@ -1,0 +1,162 @@
+#create temporary table
+	CREATE TABLE TEMP 
+	(
+	Strike DOUBLE,
+	Ticker varchar(100),
+    Bid DOUBLE,
+    Ask DOUBLE,
+    Last DOUBLE,
+    IVM DOUBLE,
+    Volume INT,
+    Expiration DATE 
+	);
+DROP TABLE TEMP;
+SELECT*FROM TEMP;
+#Pull call data and store in temp table CHECK IF THIS EXPIRATION ALREADY EXISTS
+#EVEN BETTER UNION THIS WITH THE MAIN COMPANY CALL
+
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/MSFT_Put_1-19-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+
+----------------------------------------
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/MSFT_Put_2-16-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+ 
+
+-------------------------------------------------
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/MSFT_Put_3-16-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+
+------------------------------------ 
+ ALTER TABLE TEMP 
+CHANGE COLUMN Expiration Expiration_Date 
+DATE AFTER Strike;
+
+DROP TABLE MSFT_PUT;
+call PUT ();
+SELECT*FROM MSFT_Put;
+
+DROP PROCEDURE PUT;
+DELIMITER $
+CREATE PROCEDURE PUT()
+BEGIN
+ 
+UPDATE TEMP
+SET Expiration_Date = "2018-03-16" where ticker like "MSFT 3/16/18 %";
+UPDATE TEMP
+SET Expiration_Date = "2018-01-19" where ticker like "MSFT 1/19/18 %" ; 
+UPDATE TEMP
+SET Expiration_Date = "2018-02-16" where ticker like "MSFT 2/16/18 %" ; 
+UPDATE TEMP
+SET Ticker = "MSFT";
+ALTER TABLE TEMP
+ADD COLUMN Company VARCHAR(100) default "Microsoft"
+AFTER Ticker;
+ALTER TABLE TEMP
+ADD COLUMN MONEYNESS VARCHAR(3)
+AFTER Volume;
+
+ALTER TABLE TEMP
+ADD COLUMN PAYOFF DOUBLE
+AFTER MONEYNESS;
+
+
+ 
+#2018-01-19
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-01-19" && Strike < (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-01-19" && Strike  > (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-01-19" && (Strike BETWEEN (SELECT Close -1 FROM MSFT_EQUITY WHERE Date = "2018-01-19") AND (SELECT Close + 1 FROM MSFT_EQUITY WHERE Date = "2018-01-19"));
+
+UPDATE TEMP
+SET PAYOFF = Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-01-19")
+WHERE Expiration_Date = "2018-01-19";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-01-19" && (Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-01-19")) < 0;
+
+#2018-02-16
+
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-02-16" && Strike  < (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-02-16");
+
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-02-16" && Strike > (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-02-16");
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-02-16" && (Strike BETWEEN (SELECT Close -1 FROM MSFT_EQUITY WHERE Date = "2018-02-16") AND (SELECT Close + 1 FROM MSFT_EQUITY WHERE Date = "2018-02-16"));
+
+UPDATE TEMP
+SET PAYOFF = Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-02-16")
+WHERE Expiration_Date = "2018-02-16";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-02-16" && (Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-02-16")) < 0;
+
+
+
+#2018-03-16
+
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-03-16" && Strike < (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16");
+
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-03-16" && Strike  > (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16");
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-03-16" && (Strike BETWEEN (SELECT Close -1 FROM MSFT_EQUITY WHERE Date = "2018-03-16") AND (SELECT Close + 1 FROM MSFT_EQUITY WHERE Date = "2018-03-16"));
+
+UPDATE TEMP
+SET PAYOFF = Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-03-16")
+WHERE Expiration_Date = "2018-03-16";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-03-16" && (Strike - (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-03-16")) < 0;
+
+INSERT INTO MSFT_Put
+SELECT*FROM TEMP;
+
+Alter table MSFT_put
+add column Option_Type VARCHAR(10);
+
+UPDATE MSFT_PUT
+SET Option_Type = "Put";
+
+Drop table Temp;
+
+END $
+DELIMITER ;
+
+SELECT*FROM MSFT_PUT;

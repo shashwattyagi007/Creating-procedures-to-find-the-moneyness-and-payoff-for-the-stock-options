@@ -1,0 +1,467 @@
+create database FinalProject;
+Use FinalProject;
+
+
+# MAIN SUMMARY TABLE
+
+CREATE TABLE SUMMARY
+(
+ticker VARCHAR(6) UNIQUE, # TICKER column
+company VARCHAR(100) UNIQUE#Company name column
+);
+INSERT INTO SUMMARY (ticker,company)
+VALUE ("MSFT","MICROSOFT");
+SELECT*FROM SUMMARY;
+
+
+#Procedures to generate 3 main table types
+# Load the two files: stock.txt and compustat.txt 
+
+	#Generic table to for namaing conventino TICKERequity
+	CREATE TABLE MSFT_EQUITY 
+	(
+	Date DATE,# DATE column
+    Close FLOAT, #Close
+	volume BIGINT,# volume column
+	Open FLOAT,# open price
+    High FLOAT, # high
+    Low FLOAT #Low
+	);
+DROP TABLE MSFT_EQUITY;
+
+#How to bring in data
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/HistoricalQuotesMSFT.csv'
+	INTO TABLE MSFT_EQUITY
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+SELECT*FROM GOOGL_EQUITY;
+ALTER TABLE GOOGL_EQUITY
+MODIFY COLUMN Open DOUBLE;
+
+#How to rearrange and add columns
+#=================================================================================
+ALTER TABLE MSFT_EQUITY 
+MODIFY COLUMN volume BIGINT
+AFTER Low;
+
+ALTER TABLE MSFT_EQUITY 
+MODIFY COLUMN Close FLOAT
+AFTER Open;
+
+ALTER TABLE MSFT_EQUITY
+ADD COLUMN Ticker VARCHAR(6)
+AFTER Date;
+
+UPDATE MSFT_EQUITY
+SET Ticker = "MSFT";
+
+ALTER TABLE MSFT_EQUITY
+ADD COLUMN Company VARCHAR(100)
+AFTER Ticker;
+
+UPDATE MSFT_EQUITY
+SET Company = "Microsoft";
+
+SELECT*FROM MSFT_EQUITY;
+
+ALTER TABLE MSFT_EQUITY 
+MODIFY COLUMN volume BIGINT
+AFTER Low;
+
+ALTER TABLE MSFT_EQUITY 
+MODIFY COLUMN Close FLOAT
+AFTER Open;
+
+ALTER TABLE MSFT_EQUITY
+ADD COLUMN Ticker VARCHAR(6)
+AFTER Date;
+
+UPDATE MSFT_EQUITY
+SET Ticker = "MSFT";
+
+ALTER TABLE MSFT_EQUITY
+ADD COLUMN Company VARCHAR(100)
+AFTER Ticker;
+
+UPDATE MSFT_EQUITY
+SET Company = "Microsoft";
+
+SELECT*FROM MSFT_EQUITY;
+
+#Call table structure
+#===================================================================================
+#Create after checking if Call table for that table exists
+	CREATE TABLE MSFT_Put 
+	(
+	Strike FLOAT,
+    Expiration Date,
+    Ticker varchar(100),
+	Company varchar(100),
+    Bid FLOAT,
+    Ask FLOAT,
+    Last FLOAT,
+    IVM FLOAT,
+    Volume INT
+	);
+
+
+#create temporary table
+	CREATE TABLE TEMP 
+	(
+	Strike FLOAT,
+    Ticker varchar(100),
+    Bid FLOAT,
+    Ask FLOAT,
+    Last FLOAT,
+    IVM FLOAT,
+    Volume INT
+	);
+
+
+#Pull call data and store in temp table CHECK IF THIS EXPIRATION ALREADY EXISTS
+#EVEN BETTER UNION THIS WITH THE MAIN COMPANY CALL
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/MSFT_Put_3-16-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+UPDATE TEMP
+SET Ticker = "MSFT";
+
+ALTER TABLE TEMP
+ADD COLUMN COMPANY VARCHAR(100)
+AFTER Ticker;
+
+UPDATE TEMP
+SET Company = "Microsoft";
+
+ALTER TABLE TEMP
+ADD COLUMN Expiration DATE
+AFTER Strike;
+
+UPDATE TEMP
+SET Expiration = "2018-3-16";
+
+INSERT INTO MSFT_Put
+SELECT*FROM TEMP;
+
+DROP TABLE TEMP;
+SELECT*FROM MSFT_CALL;
+#===============================================END=============
+
+
+
+#Determine in the money at the money near the money and value
+#===============================================================
+ALTER TABLE GOOGL_CALL
+ADD COLUMN MONEYNESS VARCHAR(3)
+AFTER Volume;
+SELECT*FROM GOOGL_CALL;
+
+
+UPDATE GOOGL_CALL
+SET MONEYNESS = "OTM"
+WHERE Expiration ="2018-01-19" && (Strike + 1) > (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-1-19")
+;
+
+UPDATE GOOGL_CALL
+SET MONEYNESS = "ITM"
+WHERE Expiration ="2018-01-19" && (Strike - 1)  < (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE GOOGL_CALL
+SET MONEYNESS = "NTM"
+WHERE Expiration ="2018-01-19" && (Strike - 1)  >= (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-01-19") && (Strike + 1)  <= (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-01-19")
+;
+
+ALTER TABLE GOOGL_CALL
+ADD COLUMN PAYOFF FLOAT
+AFTER MONEYNESS;
+
+UPDATE GOOGL_CALL
+SET PAYOFF = (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-01-19")-Strike
+WHERE Expiration = "2018-01-19";
+
+UPDATE GOOGL_CALL
+SET PAYOFF = 0
+WHERE Expiration = "2018-01-19" && ((SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-01-19")-Strike) < 0;
+
+SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-01-19";
+SELECT*FROM GOOGL_CALL;
+
+#FOR UpDATE THE COLUMN MONEYNESS
+ALTER TABLE MSFT_CALL
+ADD COLUMN MONEYNESS VARCHAR(3)
+AFTER Volume;
+
+ALTER TABLE MSFT_CALL
+ADD COLUMN PAYOFF FLOAT
+AFTER MONEYNESS;
+
+UPDATE MSFT_CALL
+SET MONEYNESS = "OTM"
+WHERE Expiration ="2018-01-19" && (Strike + .5) > (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE MSFT_CALL
+SET MONEYNESS = "ITM"
+WHERE Expiration ="2018-01-19" && (Strike - .5)  < (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE MSFT_CALL
+SET MONEYNESS = "NTM"
+WHERE Expiration ="2018-01-19" && (Strike - .5)  >= (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19") && (Strike + .5)  <= (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE MSFT_CALL
+SET PAYOFF = (SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-01-19")-Strike
+WHERE Expiration = "2018-01-19";
+
+UPDATE MSFT_CALL
+SET PAYOFF = 0
+WHERE Expiration = "2018-01-19" && ((SELECT Close FROM MSFT_EQUITY WHERE DATE = "2018-01-19")-Strike) < 0;
+
+SELECT*FROM MSFT_CALL;
+
+
+
+#Update the put values
+#=========================================================
+SELECT*FROM GOOGL_CALL;
+
+ALTER TABLE MSFT_PUT
+ADD COLUMN MONEYNESS VARCHAR(3)
+AFTER Volume;
+
+ALTER TABLE MSFT_PUT
+ADD COLUMN PAYOFF FLOAT
+AFTER MONEYNESS;
+
+UPDATE MSFT_PUT
+SET MONEYNESS = "OTM"
+WHERE Expiration = "2018-03-16" && (Strike - .5) < (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16")
+;
+
+UPDATE MSFT_PUT
+SET MONEYNESS = "ITM"
+WHERE Expiration = "2018-03-16" && (Strike + .5)  > (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16")
+;
+
+UPDATE MSFT_PUT
+SET MONEYNESS = "NTM"
+WHERE Expiration ="2018-03-16" && (Strike - .5)  >= (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16") && (Strike + .5)  <= (SELECT Close FROM MSFT_EQUITY WHERE Date = "2018-03-16")
+;
+
+UPDATE GOOGL_PUT
+SET PAYOFF = Strike - (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-03-16")
+WHERE Expiration = "2018-03-16";
+
+UPDATE GOOGL_PUT
+SET PAYOFF = 0
+WHERE Expiration = "2018-03-16" && (Strike - (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-03-16")) < 0;
+
+SELECT*FROM GOOGL_PUT;
+
+
+
+
+
+
+#Procedure to create/update option table
+SELECT COUNT(Expiration)
+FROM GOOGL_CALL
+WHERE Expiration = "2018-1-19";
+
+SELECT*FROM TEMP
+WHERE Ticker LIKE CONCAT("%","GOOGL","%");
+
+ALTER TABLE TEMP
+ADD COLUMN Len SMALLINT;
+
+UPDATE TEMP
+SET len = LENGTH(Ticker);
+SELECT*FROM TEMP;
+
+UPDATE TEMP
+SET Len = Len - LENGTH("GOOGL ");
+
+ALTER TABLE TEMP
+ADD COLUMN Exp VARCHAR(10);
+
+UPDATE TEMP 
+SET Exp = LEFT(Ticker,4);
+
+SET N = CONCAT(Tick,"_",TPE);
+INSERT INTO N
+SELECT*FROM TEMP;
+
+SET @table1 = CONCAT('GOOGL','_','CALL');
+SET @table2 = 'TEMP';
+SET @S = CONCAT('INSERT INTO ',@table1,'SELECT*FROM ',@table2);
+PREPARE stmt1 FROM @S;
+EXECUTE stmt1;
+
+SET @S = CONCAT('INSERT INTO ',CONCAT("GOOGL","_","CALL"),"SELECT*FROM TEMP");
+
+PREPARE stmt1 FROM @S;
+EXECUTE stmt1;
+DEALLOCATE PREPARE stmt1;
+
+
+
+DELIMITER $
+CREATE PROCEDURE UPDATEOPT (IN Tick varchar(100),IN Comp VARCHAR(100),IN Exp Date, IN TPE VARCHAR(100))
+BEGIN
+
+UPDATE TEMP
+SET Ticker = Tick;
+
+ALTER TABLE TEMP
+ADD COLUMN COMPANY VARCHAR(100)
+AFTER Ticker;
+
+UPDATE TEMP
+SET Company = Comp;
+
+ALTER TABLE TEMP
+ADD COLUMN Expiration DATE
+AFTER Strike;
+
+UPDATE TEMP
+SET Expiration = Exp;
+
+SET N = CONCAT(Tick,"_",TPE);
+INSERT INTO N
+SELECT*FROM TEMP;
+
+DROP TABLE TEMP;
+END $
+DELIMITER ;
+DROP procedure HWN3;
+CALL HWN3(3,9);
+SELECT * FROM HW3;
+
+
+
+DELIMITER $
+CREATE PROCEDURE UPDATEOPTION (IN Tick varchar(100),IN Comp VARCHAR(100),IN Exp Date, IN TPE VARCHAR(100))
+
+BEGIN
+
+IF (SELECT COUNT(Expiration) FROM D WHERE Expiration = Exp) = 0 
+	THEN 
+		SET N = CONCAT(Tick,"_",TPE);
+		CREATE TABLE N
+		(
+		Strike smallint,
+		Expiration Date,
+		Ticker varchar(100),
+		Company varchar(100),
+		Bid FLOAT,
+		Ask FLOAT,
+		Last FLOAT,
+		IVM FLOAT,
+		Volume INT
+		);
+
+		CREATE TABLE TEMP 
+		(
+		Strike smallint,
+		Ticker varchar(100),
+		Bid FLOAT,
+		Ask FLOAT,
+		Last FLOAT,
+		IVM FLOAT,
+		Volume INT
+		);		
+        UPDATE TEMP
+		SET Ticker = Tick;
+
+		ALTER TABLE TEMP
+		ADD COLUMN COMPANY VARCHAR(100)
+		AFTER Ticker;
+
+		UPDATE TEMP
+		SET Company = COMP;
+
+		ALTER TABLE TEMP
+		ADD COLUMN Expiration DATE
+		AFTER Strike;
+
+		UPDATE TEMP
+		SET Expiration = Exp;
+
+		INSERT INTO N
+		SELECT*FROM TEMP;
+
+		DROP TABLE TEMP;
+
+Else
+	CREATE TABLE TEMP 
+	(
+	Strike smallint,
+	Ticker varchar(100),
+	Bid FLOAT,
+	Ask FLOAT,
+	Last FLOAT,
+	IVM FLOAT,
+	Volume INT
+	);
+
+        UPDATE TEMP
+		SET Ticker = Tick;
+
+		ALTER TABLE TEMP
+		ADD COLUMN COMPANY VARCHAR(100)
+		AFTER Ticker;
+
+		UPDATE TEMP
+		SET Company = COMP;
+
+		ALTER TABLE TEMP
+		ADD COLUMN Expiration DATE
+		AFTER Strike;
+
+		UPDATE TEMP
+		SET Expiration = Exp;
+
+		INSERT INTO N
+		SELECT*FROM TEMP;
+
+		DROP TABLE TEMP;
+
+END IF;
+
+
+END $
+DELIMITER ;
+
+
+DROP procedure HWN3;
+CALL HWN3(3,9);
+SELECT * FROM HW3;
+
+
+SELECT*FROM GOOGL_CALL;
+
+	CREATE TABLE GOOGL_Put 
+	(
+	Strike smallint,
+    Ticker varchar(20),
+    Bid FLOAT,
+    Ask FLOAT,
+    Last FLOAT,
+    IVM FLOAT,
+    Volume INT
+	);
+
+
+
+
+#Procedure to update SUMMARY TABLE
+

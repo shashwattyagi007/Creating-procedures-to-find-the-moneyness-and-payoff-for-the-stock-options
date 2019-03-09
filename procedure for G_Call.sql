@@ -1,0 +1,184 @@
+CREATE TABLE GOOGL_Call
+	(
+	Strike DOUBLE,
+    Expiration Date,
+    Ticker varchar(100),
+	Company varchar(100),
+    Bid DOUBLE,
+    Ask DOUBLE,
+    Last DOUBLE,
+    IVM DOUBLE,
+    Volume INT,
+    MONEYNESS VARCHAR(10),
+    PAYOFF DOUBLE
+	);
+    
+    Drop table GOOGL_Call;
+    
+    #create temporary table
+	CREATE TABLE TEMP 
+	(
+	Strike DOUBLE,
+	Ticker varchar(100),
+    Bid DOUBLE,
+    Ask DOUBLE,
+    Last DOUBLE,
+    IVM DOUBLE,
+    Volume INT,
+    Expiration DATE 
+	);
+DROP TABLE TEMP;
+SELECT*FROM TEMP;
+SELECT*FROM GOOGL_CALL;
+TRUNCATE GOOGL_CALL;
+#Pull call data and store in temp table CHECK IF THIS EXPIRATION ALREADY EXISTS
+#EVEN BETTER UNION THIS WITH THE MAIN COMPANY CALL
+
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/GOOGL_Call_1-19-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+
+----------------------------------------
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/GOOGL_Call_2-16-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+ 
+
+-------------------------------------------------
+LOAD DATA LOCAL INFILE 'C:/ProgramData/MySQL/MySQL Server 5.7/Uploads/GOOGL_Call_3-16-18.csv'
+	INTO TABLE TEMP
+    FIELDS TERMINATED BY ',' 
+	ENCLOSED BY '"' 
+	LINES TERMINATED BY '\r\n'
+    IGNORE 2 LINES;
+
+
+------------------------------------ 
+ ALTER TABLE TEMP 
+CHANGE COLUMN Expiration Expiration_Date 
+DATE AFTER Strike;
+
+DROP TABLE GOOGL_Call;
+call G_Call();
+SELECT*FROM GOOGL_Call;
+
+DROP PROCEDURE G_CALL;
+
+DELIMITER $
+CREATE PROCEDURE G_CALL()
+BEGIN
+ 
+UPDATE TEMP
+SET Expiration_Date = "2018-03-16" where ticker like "GOOGL 3/16/18 %";
+UPDATE TEMP
+SET Expiration_Date = "2018-01-19" where ticker like "GOOGL 1/19/18 %" ; 
+UPDATE TEMP
+SET Expiration_Date = "2018-02-16" where ticker like "GOOGL 2/16/18 %" ; 
+UPDATE TEMP
+SET Ticker = "GOOGL";
+ALTER TABLE TEMP
+ADD COLUMN Company VARCHAR(100) default "Google Class A"
+AFTER Ticker;
+ALTER TABLE TEMP
+ADD COLUMN MONEYNESS VARCHAR(3)
+AFTER Volume;
+
+ALTER TABLE TEMP
+ADD COLUMN PAYOFF DOUBLE
+AFTER MONEYNESS;
+
+
+ 
+#2018-01-19
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-01-19" && Strike < (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-01-19" && Strike  > (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-01-19")
+;
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-01-19" && (Strike BETWEEN (SELECT Close -1 FROM GOOGL_EQUITY WHERE Date = "2018-01-19") AND (SELECT Close + 1 FROM GOOGL_EQUITY WHERE Date = "2018-01-19"));
+
+UPDATE TEMP
+SET PAYOFF = (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-01-19") - Strike
+WHERE Expiration_Date = "2018-01-19";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-01-19" && ((SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-01-19") - Strike) < 0;
+
+#2018-02-16
+
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-02-16" && Strike  < (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-02-16");
+
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-02-16" && Strike > (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-02-16");
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-02-16" && (Strike BETWEEN (SELECT Close -1 FROM GOOGL_EQUITY WHERE Date = "2018-02-16") AND (SELECT Close + 1 FROM GOOGL_EQUITY WHERE Date = "2018-02-16"));
+
+UPDATE TEMP
+SET PAYOFF = (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-02-16") - Strike
+WHERE Expiration_Date = "2018-02-16";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-02-16" && ((SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-02-16") - Strike) < 0;
+
+
+
+#2018-03-16
+
+UPDATE TEMP
+SET MONEYNESS = "ITM"
+WHERE Expiration_Date = "2018-03-16" && Strike < (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-03-16");
+
+UPDATE TEMP
+SET MONEYNESS = "OTM"
+WHERE Expiration_Date = "2018-03-16" && Strike  > (SELECT Close FROM GOOGL_EQUITY WHERE Date = "2018-03-16");
+
+UPDATE TEMP
+SET MONEYNESS = "NTM"
+WHERE Expiration_Date ="2018-03-16" && (Strike BETWEEN (SELECT Close -1 FROM GOOGL_EQUITY WHERE Date = "2018-03-16") AND (SELECT Close + 1 FROM GOOGL_EQUITY WHERE Date = "2018-03-16"));
+
+UPDATE TEMP
+SET PAYOFF = (SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-03-16") - Strike
+WHERE Expiration_Date = "2018-03-16";
+
+UPDATE TEMP
+SET PAYOFF = 0
+WHERE Expiration_Date = "2018-03-16" && ((SELECT Close FROM GOOGL_EQUITY WHERE DATE = "2018-03-16") - Strike) < 0;
+
+INSERT INTO GOOGL_Call
+SELECT*FROM TEMP;
+
+Alter table GOOGL_Call
+add column Option_Type VARCHAR(10);
+
+UPDATE GOOGL_Call
+SET Option_Type = "Call";
+
+Drop table Temp;
+
+SELECT*FROM GOOGL_CALL;
+
+END $
+DELIMITER ;
+
+SELECT*FROM GOOGL_PUT;
